@@ -33,7 +33,7 @@
 #define pmsRX          D6
 
 // ------------------------- Device -----------------------------------------------------
-String         firmwareVersion         = "2.1.1";
+String         firmwareVersion         = "2.1.2-sleep-fix";
 const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.1</p>";
 char           klimerkoID[32];
 
@@ -374,7 +374,7 @@ void readBME() { // Function for reading data from the BME280 Sensor
 void pmsPower(bool state) { // Controls sleep state of PMS sensor
   if (state) {
     pms.wakeUp();
-    pms.passiveMode();
+  //  pms.passiveMode(); // ovo ne pripada ovde
     pmsWoken = true;
   } else {
     pmsSerial.flush();
@@ -811,7 +811,9 @@ String wifiSignal() {
 
 void initPMS() {
   pmsSerial.begin(9600);
+  pms.passiveMode(); // ovde treba da se settuje passive, kao u primerima od originalne PMS biblioteke
   pmsPower(true);
+
 }
 
 void initBME() {
