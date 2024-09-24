@@ -36,13 +36,15 @@ jobs:
                 source-url: http://arduino.esp8266.com/stable/package_esp8266com_index.json
                 version: 3.1.2
                 # version: default
-#            libraries: |
-#              - ./Klimerko_Firmware/src/* 
+            libraries: |
+              - 
             sketch-paths: |
               - ./Klimerko_Firmware/
             sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
 
-      
+            cli-compile-flags: |
+              - e
+            
 #      - name: Upload sketches report to workflow artifact
 #        uses: actions/upload-artifact@v3
 #        with:
