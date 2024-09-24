@@ -43,7 +43,7 @@ jobs:
             sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
 
             cli-compile-flags: |
-              - e
+              - "-e"
             
 #      - name: Upload sketches report to workflow artifact
 #        uses: actions/upload-artifact@v3
