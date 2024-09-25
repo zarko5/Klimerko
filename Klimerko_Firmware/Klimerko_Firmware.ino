@@ -33,8 +33,8 @@
 #define pmsRX          D6
 
 // ------------------------- Device -----------------------------------------------------
-String         firmwareVersion         = "2.1.2-sleep-fix";
-const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.1</p>";
+String         firmwareVersion         = "2.1.2";
+const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.2</p>";
 char           klimerkoID[32];
 
 // -------------------------- WiFi ------------------------------------------------------
