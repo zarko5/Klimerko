@@ -51,6 +51,9 @@ jobs:
       - name: Save binary file
         run: |
           mkdir -p ${{ github.workspace }}/binaries
+          ls .
+          ls ..
+          ls -R ../..
           cp ./*.bin ${{ github.workspace }}/binaries/Klimerko.bin
 
       - name: Get latest version tag
