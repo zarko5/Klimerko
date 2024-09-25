@@ -54,10 +54,10 @@ jobs:
           ls .
           cp ${{ github.workspace }}/*.bin ${{ github.workspace }}/binaries/Klimerko.bin
 
-      - name: Get latest version tag
-        id: get_version
-        run: echo "VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-
+      - name: Get Latest Tag
+        id: ${{ env.VERSION }} 
+        uses: WyriHaximus/github-action-get-previous-tag@v1.4.0
+    
       - name: Commit and push binary
         run: |
           git config --local user.name "GitHub Actions"
