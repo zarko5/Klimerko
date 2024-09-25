@@ -44,8 +44,9 @@ jobs:
             sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
 
             cli-compile-flags: |
-              - "-e"
-              - "--output-dir ./"
+              - -e
+              - --output-dir
+              - ./
               
       - name: Save binary file
         run: |
