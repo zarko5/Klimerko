@@ -49,7 +49,7 @@ jobs:
       - name: Save binary file
         run: |
           mkdir -p ${{ github.workspace }}/binaries
-          cp ./Klimerko_Firmware/*.bin ${{ github.workspace }}/binaries/Klimerko.ino.bin
+          cp ./Klimerko_Firmware/*.bin ${{ github.workspace }}/binaries/Klimerko.bin
 
       - name: Get latest version tag
         id: get_version
@@ -59,7 +59,7 @@ jobs:
         run: |
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
-          git add binaries/Klimerko.ino.bin
+          git add binaries/Klimerko.bin
           git commit -m "Add auto-compiled binary"
           git push
     
@@ -68,7 +68,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.VERSION }} 
-          release_name: Release ${{ env.VERSION }}
           body: "Automated release of Klimerko binary"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
@@ -77,7 +76,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.VERSION }} 
-          files: binaries/Klimerko.ino.bin
+          files: binaries/Klimerko.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
   
