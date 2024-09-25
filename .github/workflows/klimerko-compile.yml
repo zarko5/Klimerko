@@ -15,6 +15,7 @@ on:
 env:
   SKETCHES_REPORTS_PATH: sketches-reports
   SKETCHES_REPORTS_ARTIFACT_NAME: Klimerko
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
 
 jobs:
   compile-sketch:
@@ -44,7 +45,43 @@ jobs:
 
             cli-compile-flags: |
               - "-e"
-            
+              
+      - name: Save binary file
+        run: |
+          mkdir -p ${{ github.workspace }}/binaries
+          cp ${{ env.SKETCHES_REPORTS_PATH }}/*.bin ${{ github.workspace }}/binaries/Klimerko.ino.bin
+
+      - name: Get latest version tag
+        id: get_version
+        run: echo "VERSION=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+
+      - name: Commit and push binary
+        run: |
+          git config --local user.name "GitHub Actions"
+          git config --local user.email "actions@github.com"
+          git add binaries/Klimerko.ino.bin
+          git commit -m "Add auto-compiled binary"
+          git push
+    
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }} 
+          release_name: Release ${{ env.VERSION }}
+          body: "Automated release of Klimerko binary"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+    
+      - name: Upload Binary to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }} 
+          files: binaries/Klimerko.ino.bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+  
+
 #      - name: Upload sketches report to workflow artifact
 #        uses: actions/upload-artifact@v3
 #        with:
