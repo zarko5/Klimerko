@@ -55,7 +55,7 @@ jobs:
           cp ${{ github.workspace }}/*.bin ${{ github.workspace }}/binaries/Klimerko.bin
 
       - name: Get Latest Tag
-        id: ${{ env.VERSION }} 
+        id: tag_version
         uses: WyriHaximus/github-action-get-previous-tag@v1.4.0
     
       - name: Commit and push binary
@@ -70,7 +70,7 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }} 
+          tag_name: ${{ steps.tag_version.outputs.tag }}
           body: "Automated release of Klimerko binary"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
@@ -78,7 +78,7 @@ jobs:
       - name: Upload Binary to Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }} 
+          tag_name: ${{ steps.tag_version.outputs.tag }}
           files: binaries/Klimerko.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
