@@ -45,7 +45,7 @@ jobs:
 
             cli-compile-flags: |
               - "-e"
-              "--output-dir ./"
+              - "--output-dir ./"
               
       - name: Save binary file
         run: |
