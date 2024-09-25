@@ -46,15 +46,13 @@ jobs:
             cli-compile-flags: |
               - -e
               - --output-dir
-              - ./
+              - ${{ github.workspace }}
               
       - name: Save binary file
         run: |
           mkdir -p ${{ github.workspace }}/binaries
           ls .
-          ls ..
-          ls -R ../..
-          cp ./*.bin ${{ github.workspace }}/binaries/Klimerko.bin
+          cp ${{ github.workspace }}/*.bin ${{ github.workspace }}/binaries/Klimerko.bin
 
       - name: Get latest version tag
         id: get_version
