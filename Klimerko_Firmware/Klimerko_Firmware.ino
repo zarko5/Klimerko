@@ -16,6 +16,19 @@
  *  Textual Air Quality Scale is based on PM10 criteria defined by RS Government (http://www.amskv.sepa.gov.rs/kriterijumi.php)
  *  Excellent (0-20), Good (21-40), Acceptable (41-50), Polluted (51-100), Very Polluted (Over 100)
  */
+// update link 
+// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/Klimerko.bin
+// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/version.txt
+
+
+
+// remote ota
+#include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
+
+
+
 
 #include "src/AdafruitBME280/Adafruit_Sensor.h"
 #include "src/AdafruitBME280/Adafruit_BME280.h"
@@ -29,13 +42,21 @@
 #include <EEPROM.h>
 
 #define BUTTON_PIN     0
-#define pmsTX          D5
-#define pmsRX          D6
+#define pmsTX          5
+#define pmsRX          6
 
 // ------------------------- Device -----------------------------------------------------
 String         firmwareVersion         = "2.1.2";
 const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.2</p>";
 char           klimerkoID[32];
+
+#define CURRENT_VERSION firmwareVersion
+#define VERSION_URL "// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/version.txt"
+#define FIRMWARE_URL "// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/Klimerko.bin"
+
+
+
+
 
 // -------------------------- WiFi ------------------------------------------------------
 const int      wifiReconnectInterval   = 60;
@@ -137,6 +158,66 @@ movingAvg temp(sensorAverageSamples);
 movingAvg hum(sensorAverageSamples);
 movingAvg pres(sensorAverageSamples);
 
+
+
+String getRemoteVersion() {
+  std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+  client->setInsecure();  // For testing only (see note below)
+
+  HTTPClient https;
+
+  if (!https.begin(*client, VERSION_URL))
+    return "";
+
+  int httpCode = https.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    https.end();
+    return "";
+  }
+
+  String version = https.getString();
+  version.trim();
+  https.end();
+
+  return version;
+}
+
+void checkForOTA() {
+  String remoteVersion = getRemoteVersion();
+
+  if (remoteVersion.length() == 0)
+    return;
+
+  if (remoteVersion == CURRENT_VERSION)
+    return;
+
+  std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+  client->setInsecure();  // For testing only
+
+  ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW); // optional status LED
+
+  t_httpUpdate_return ret = ESPhttpUpdate.update(*client, FIRMWARE_URL);
+
+  switch (ret) {
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("Update failed. Error (%d): %s\n",
+                    ESPhttpUpdate.getLastError(),
+                    ESPhttpUpdate.getLastErrorString().c_str());
+      break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+      Serial.println("No update available.");
+      break;
+
+    case HTTP_UPDATE_OK:
+      Serial.println("Update successful. Rebooting...");
+      break;
+  }
+}
+
+
+
+
 void sensorLoop() { // Reads and publishes sensor data and wakes up pms sensor in predefined intervals
   // Check if it's time to wake up PMS7003
   if (millis() - sensorReadTime >= readIntervalMillis() - (pmsWakeBefore * 1000) && !pmsWoken && pmsSensorOnline) {
@@ -157,6 +238,7 @@ void sensorLoop() { // Reads and publishes sensor data and wakes up pms sensor i
         dataPublishFailed = false;
         dataPublishTime = millis();
         publishSensorData();
+        checkForOTA();
       } else {
         if (!dataPublishFailed) {
           Serial.println("[DATA] Can't send sensor data because Klimerko is not connected to AllThingsTalk");
