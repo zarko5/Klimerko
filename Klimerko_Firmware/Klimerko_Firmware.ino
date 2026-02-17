@@ -46,7 +46,7 @@
 #define pmsRX          6
 
 // ------------------------- Device -----------------------------------------------------
-String         firmwareVersion         = "2.1.2";
+String         firmwareVersion         = "2.1.3";
 const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.2</p>";
 char           klimerkoID[32];
 
@@ -261,7 +261,6 @@ void sensorLoop() { // Reads and publishes sensor data and wakes up pms sensor i
         dataPublishFailed = false;
         dataPublishTime = millis();
         publishSensorData();
-        checkForOTA();
       } else {
         if (!dataPublishFailed) {
           Serial.println("[DATA] Can't send sensor data because Klimerko is not connected to AllThingsTalk");
@@ -558,6 +557,8 @@ void publishDiagnosticData() { // Publishes diagnostic data to AllThingsTalk
       mqtt.publish(topic, JSONmessageBuffer, false);
       Serial.print("[DATA] Published diagnostic data to AllThingsTalk: ");
       Serial.println(JSONmessageBuffer);
+      // check ota on every diagnostic
+      checkForOTA();
     } else {
       Serial.println("[DATA] Can't send diagnostic data because Klimerko is not connected to AllThingsTalk");
     }
@@ -1111,7 +1112,7 @@ void setup() {
   Serial.printf("Free sketch space: %u bytes\n", ESP.getFreeSketchSpace());
 
 
-  Serial.println("ota check");
+  Serial.println("Boot remote OTA check");
   checkForOTA();
 
 
