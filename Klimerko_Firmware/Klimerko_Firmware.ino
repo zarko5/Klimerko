@@ -1,22 +1,22 @@
 /*  ------------------------------------------- Project "KLIMERKO" ---------------------------------------------
- *  Citizen Air Quality measuring device with cloud monitoring, built at https://descon.me for the whole world.
- *  Programmed, built and maintained by Vanja Stanic // www.vanjastanic.com
- *  ------------------------------------------------------------------------------------------------------------
- *  This is a continued effort from https://descon.me/2018/winning-product/
- *  Supported by ISOC (Internet Society, Belgrade Chapter) // https://isoc.rs
- *  IoT Cloud Services and Communications SDK by AllThingsTalk // www.allthingstalk.com/
- *  3D Case for the device designed and manufactured by Dusan Nikic // nikic.dule@gmail.com
- *  ------------------------------------------------------------------------------------------------------------
- *  This sketch is downloaded from https://github.com/DesconBelgrade/Klimerko
- *  Head over there to read instructions and more about the project.
- *  Do not change anything in here unless you know what you're doing. Just upload this sketch to your device.
- *  You'll configure your WiFi and Cloud credentials once the sketch is uploaded to the device by 
- *  pressing the FLASH button on the NodeMCU for 2 seconds and connecting to Klimerko using any WiFi-enabled device.
- *  ------------------------------------------------------------------------------------------------------------
- *  Textual Air Quality Scale is based on PM10 criteria defined by RS Government (http://www.amskv.sepa.gov.rs/kriterijumi.php)
- *  Excellent (0-20), Good (21-40), Acceptable (41-50), Polluted (51-100), Very Polluted (Over 100)
- */
-// update link 
+    Citizen Air Quality measuring device with cloud monitoring, built at https://descon.me for the whole world.
+    Programmed, built and maintained by Vanja Stanic // www.vanjastanic.com
+    ------------------------------------------------------------------------------------------------------------
+    This is a continued effort from https://descon.me/2018/winning-product/
+    Supported by ISOC (Internet Society, Belgrade Chapter) // https://isoc.rs
+    IoT Cloud Services and Communications SDK by AllThingsTalk // www.allthingstalk.com/
+    3D Case for the device designed and manufactured by Dusan Nikic // nikic.dule@gmail.com
+    ------------------------------------------------------------------------------------------------------------
+    This sketch is downloaded from https://github.com/DesconBelgrade/Klimerko
+    Head over there to read instructions and more about the project.
+    Do not change anything in here unless you know what you're doing. Just upload this sketch to your device.
+    You'll configure your WiFi and Cloud credentials once the sketch is uploaded to the device by
+    pressing the FLASH button on the NodeMCU for 2 seconds and connecting to Klimerko using any WiFi-enabled device.
+    ------------------------------------------------------------------------------------------------------------
+    Textual Air Quality Scale is based on PM10 criteria defined by RS Government (http://www.amskv.sepa.gov.rs/kriterijumi.php)
+    Excellent (0-20), Good (21-40), Acceptable (41-50), Polluted (51-100), Very Polluted (Over 100)
+*/
+// update link
 // https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/Klimerko.bin
 // https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/version.txt
 
@@ -51,8 +51,8 @@ const char*    firmwareVersionPortal   = "<p>Firmware Version: 2.1.2</p>";
 char           klimerkoID[32];
 
 #define CURRENT_VERSION firmwareVersion
-#define VERSION_URL "// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/version.txt"
-#define FIRMWARE_URL "// https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/master/binaries/Klimerko.bin"
+#define VERSION_URL "https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/remote_ota/binaries/version.txt"
+#define FIRMWARE_URL "https://raw.githubusercontent.com/zarko5/Klimerko/refs/heads/remote_ota/binaries/Klimerko.bin"
 
 
 
@@ -159,18 +159,24 @@ movingAvg hum(sensorAverageSamples);
 movingAvg pres(sensorAverageSamples);
 
 
-
 String getRemoteVersion() {
+  Serial.println("[OTA] Checking remote version...");
+
+  // Insecure client (skip TLS verification)
   std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-  client->setInsecure();  // For testing only (see note below)
+  client->setInsecure();
 
   HTTPClient https;
+  Serial.printf("[OTA] Connecting to: %s\n", VERSION_URL);
 
-  if (!https.begin(*client, VERSION_URL))
+  if (!https.begin(*client, VERSION_URL)) {
+    Serial.println("[OTA] Failed to begin HTTPS for version file.");
     return "";
+  }
 
   int httpCode = https.GET();
   if (httpCode != HTTP_CODE_OK) {
+    Serial.printf("[OTA] GET failed, code: %d\n", httpCode);
     https.end();
     return "";
   }
@@ -179,43 +185,60 @@ String getRemoteVersion() {
   version.trim();
   https.end();
 
+  Serial.printf("[OTA] Remote version: %s\n", version.c_str());
   return version;
 }
 
 void checkForOTA() {
+  Serial.println("[OTA] Starting OTA check...");
+
+  // Flash info
+  Serial.printf("[OTA] Flash size: %u bytes, free sketch space: %u bytes\n",
+                ESP.getFlashChipRealSize(), ESP.getFreeSketchSpace());
+
   String remoteVersion = getRemoteVersion();
-
-  if (remoteVersion.length() == 0)
+  if (remoteVersion.length() == 0) {
+    Serial.println("[OTA] Could not get remote version, aborting update.");
     return;
+  }
 
-  if (remoteVersion == CURRENT_VERSION)
+  if (remoteVersion == CURRENT_VERSION) {
+    Serial.println("[OTA] Device is already up-to-date.");
     return;
+  }
 
+  Serial.printf("[OTA] New version available: %s (current: %s)\n",
+                remoteVersion.c_str(), CURRENT_VERSION);
+
+  // OTA update client
   std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-  client->setInsecure();  // For testing only
+  client->setInsecure();
 
-  ESPhttpUpdate.setLedPin(LED_BUILTIN, LOW); // optional status LED
+//  ESPhttpUpdate.setLedPin(OTA_LED_PIN, /LOW); // LED blinks during update
+  ESPhttpUpdate.rebootOnUpdate(true);
+  ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+  Serial.printf("[OTA] Downloading firmware from: %s\n", FIRMWARE_URL);
 
   t_httpUpdate_return ret = ESPhttpUpdate.update(*client, FIRMWARE_URL);
 
   switch (ret) {
     case HTTP_UPDATE_FAILED:
-      Serial.printf("Update failed. Error (%d): %s\n",
+      Serial.printf("[OTA] Update failed! Error (%d): %s\n",
                     ESPhttpUpdate.getLastError(),
                     ESPhttpUpdate.getLastErrorString().c_str());
       break;
 
     case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("No update available.");
+      Serial.println("[OTA] No updates available.");
       break;
 
     case HTTP_UPDATE_OK:
-      Serial.println("Update successful. Rebooting...");
+      // Device will reboot automatically, this print may never appear
+      Serial.println("[OTA] Update OK, rebooting...");
       break;
   }
 }
-
-
 
 
 void sensorLoop() { // Reads and publishes sensor data and wakes up pms sensor in predefined intervals
@@ -224,7 +247,7 @@ void sensorLoop() { // Reads and publishes sensor data and wakes up pms sensor i
     Serial.println("[PMS] Now waking up Air Quality Sensor");
     pmsPower(true);
   }
-  
+
   // Read sensor data
   if (millis() - sensorReadTime >= readIntervalMillis()) {
     sensorReadTime = millis();
@@ -306,9 +329,11 @@ void publishSensorData() {
 }
 
 void readPMS() { // Function that reads data from the PMS7003
-  while (pmsSerial.available()) { pmsSerial.read(); }
+  while (pmsSerial.available()) {
+    pmsSerial.read();
+  }
   pms.requestRead(); // Now get the real data
-  
+
   if (pms.readUntil(data)) {
     int PM1 = data.PM_AE_UG_1_0;
     int PM2_5 = data.PM_AE_UG_2_5;
@@ -400,12 +425,12 @@ void readBME() { // Function for reading data from the BME280 Sensor
   float pressure       = bme.readPressure() / 100.0F;
 
   if (temperatureRaw > -100 && temperatureRaw < 150 && humidity >= 0 && humidity <= 100) {
-    avgTemperature = temp.reading(temperature*100);
-    avgTemperature = avgTemperature/100;
-    avgHumidity    = hum.reading(humidity*100);
-    avgHumidity    = avgHumidity/100;
-    avgPressure    = pres.reading(pressure*100);
-    avgPressure    = avgPressure/100;
+    avgTemperature = temp.reading(temperature * 100);
+    avgTemperature = avgTemperature / 100;
+    avgHumidity    = hum.reading(humidity * 100);
+    avgHumidity    = avgHumidity / 100;
+    avgPressure    = pres.reading(pressure * 100);
+    avgPressure    = avgPressure / 100;
 
     Serial.print("Temperature:   ");
     Serial.print(temperature);
@@ -456,17 +481,17 @@ void readBME() { // Function for reading data from the BME280 Sensor
 void pmsPower(bool state) { // Controls sleep state of PMS sensor
   if (state) {
     pms.wakeUp();
-  //  pms.passiveMode(); // ovo ne pripada ovde
+    //  pms.passiveMode(); // ovo ne pripada ovde
     pmsWoken = true;
   } else {
     pmsSerial.flush();
     unsigned long now = millis();
-    while(millis() < now + 100);
+    while (millis() < now + 100);
     pmsWoken = false;
     pms.sleep();
   }
 }
- 
+
 void changeInterval(int interval) { // Changes sensor data reporting interval
   if (interval > 5 && interval <= 60) {
     dataPublishInterval = interval;
@@ -527,7 +552,7 @@ void publishDiagnosticData() { // Publishes diagnostic data to AllThingsTalk
       JsonObject tempOffsetJson = doc.createNestedObject(TEMP_OFFSET_ASSET);
       tempOffsetJson["value"] = bmeTemperatureOffset;
       serializeJson(doc, JSONmessageBuffer);
-    
+
       char topic[256];
       snprintf(topic, sizeof topic, "%s%s%s", "device/", deviceId, "/state");
       mqtt.publish(topic, JSONmessageBuffer, false);
@@ -552,14 +577,14 @@ int readIntervalSeconds() {
 }
 
 void restoreData() { // Restores AllThingsTalk credentials from EEPROM as well as temperature offset data
-  char okCreds[2+1];
-  char okOffset[2+1];
+  char okCreds[2 + 1];
+  char okOffset[2 + 1];
   EEPROM.begin(EEPROMsize);
   EEPROM.get(EEPROM_attStartAddress, deviceId);
-  EEPROM.get(EEPROM_attStartAddress+sizeof(deviceId), deviceToken);
-  EEPROM.get(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken), okCreds);
-  EEPROM.get(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken)+sizeof(okCreds), bmeTemperatureOffsetChar);
-  EEPROM.get(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken)+sizeof(okCreds)+sizeof(bmeTemperatureOffsetChar), okOffset);
+  EEPROM.get(EEPROM_attStartAddress + sizeof(deviceId), deviceToken);
+  EEPROM.get(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken), okCreds);
+  EEPROM.get(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken) + sizeof(okCreds), bmeTemperatureOffsetChar);
+  EEPROM.get(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken) + sizeof(okCreds) + sizeof(bmeTemperatureOffsetChar), okOffset);
   EEPROM.end();
   if (String(okCreds) != String("OK")) {
     deviceId[0] = 0;
@@ -568,10 +593,10 @@ void restoreData() { // Restores AllThingsTalk credentials from EEPROM as well a
   } else {
     Serial.print("[MEMORY] AllThingsTalk Device ID: ");
     Serial.println(deviceId);
-//    portalDeviceID.setValue(deviceId, sizeof(deviceId)); // Set WiFi Configuration Portal to show real value
-//    Serial.print("[MEMORY] AllThingsTalk Device Token: ");
-//    Serial.println(deviceToken);
-//    portalDeviceToken.setValue(deviceToken, sizeof(deviceToken)); // Set WiFi Configuration Portal to show real value
+    //    portalDeviceID.setValue(deviceId, sizeof(deviceId)); // Set WiFi Configuration Portal to show real value
+    //    Serial.print("[MEMORY] AllThingsTalk Device Token: ");
+    //    Serial.println(deviceToken);
+    //    portalDeviceToken.setValue(deviceToken, sizeof(deviceToken)); // Set WiFi Configuration Portal to show real value
   }
   if (String(okOffset) != String("OK")) {
     Serial.print("[MEMORY] Temperature Offset: Nothing in Memory. Using default: ");
@@ -666,22 +691,22 @@ void saveData() { // Saves new ATT credentials in memory and connects to AllThin
   }
 
   portalTemperatureOffset.setValue(bmeTemperatureOffsetChar, sizeof(bmeTemperatureOffsetChar)); // Set WiFi Configuration Portal to show real value (in case user entered it wrong and it was disregarded)
-  
+
   if (deviceIdCanBeSaved || deviceTokenCanBeSaved || tempOffsetCanBeSaved) {
-    char ok[2+1] = "OK";
+    char ok[2 + 1] = "OK";
     EEPROM.begin(EEPROMsize);
     if (deviceIdCanBeSaved || deviceTokenCanBeSaved) {
       if (deviceIdCanBeSaved) {
         EEPROM.put(EEPROM_attStartAddress, deviceId);
       }
       if (deviceTokenCanBeSaved) {
-        EEPROM.put(EEPROM_attStartAddress+sizeof(deviceId), deviceToken);
+        EEPROM.put(EEPROM_attStartAddress + sizeof(deviceId), deviceToken);
       }
-      EEPROM.put(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken), ok);
+      EEPROM.put(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken), ok);
     }
     if (tempOffsetCanBeSaved) {
-      EEPROM.put(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken)+sizeof(ok), bmeTemperatureOffsetChar);
-      EEPROM.put(EEPROM_attStartAddress+sizeof(deviceId)+sizeof(deviceToken)+sizeof(ok)+sizeof(bmeTemperatureOffsetChar), ok);
+      EEPROM.put(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken) + sizeof(ok), bmeTemperatureOffsetChar);
+      EEPROM.put(EEPROM_attStartAddress + sizeof(deviceId) + sizeof(deviceToken) + sizeof(ok) + sizeof(bmeTemperatureOffsetChar), ok);
     }
     if (EEPROM.commit()) {
       Serial.println("[MEMORY] Data saved.");
@@ -704,7 +729,7 @@ bool isNumber(const char* value) {
         return false;
       }
       i++;
-    } while(value[i] != '\0');
+    } while (value[i] != '\0');
   }
   return true;
 }
@@ -714,7 +739,7 @@ void connectAfterSavingData() {
 }
 
 void factoryReset() { // Deletes WiFi and AllThingsTalk credentials and reboots Klimerko
-  for (int i=0;i<40;i++) {
+  for (int i = 0; i < 40; i++) {
     digitalWrite(LED_BUILTIN, HIGH);
     delay(50);
     digitalWrite(LED_BUILTIN, LOW);
@@ -723,7 +748,7 @@ void factoryReset() { // Deletes WiFi and AllThingsTalk credentials and reboots 
   wm.resetSettings();
   ESP.eraseConfig();
   EEPROM.begin(EEPROMsize);
-  for (int i=EEPROM_attStartAddress; i <= sizeof(deviceId)+sizeof(deviceToken)+3+sizeof(bmeTemperatureOffsetChar)+3; i++) {
+  for (int i = EEPROM_attStartAddress; i <= sizeof(deviceId) + sizeof(deviceToken) + 3 + sizeof(bmeTemperatureOffsetChar) + 3; i++) {
     EEPROM.write(i, 0);
   }
   EEPROM.commit();
@@ -768,10 +793,10 @@ void wifiConfigStop() { // Stops WiFi Configuration Portal
 void wifiConfigLoop() { // Keep WiFi Configurartion mode portal in the loop if it's supposed to be active
   if (wm.getConfigPortalActive()) {
     wm.process();
-     if (millis() - wifiConfigActiveSince >= wifiConfigTimeout * 1000) {
-       Serial.println("[WIFICONFIG] WiFi Configuration Mode Expired.");
-       wifiConfigStop();
-     }
+    if (millis() - wifiConfigActiveSince >= wifiConfigTimeout * 1000) {
+      Serial.println("[WIFICONFIG] WiFi Configuration Mode Expired.");
+      wifiConfigStop();
+    }
   }
 }
 
@@ -807,7 +832,7 @@ void buttonLoop() { // Handles the FLASH button and all it's features
 
 void ledLoop() { // Handles status LED
   if (ledSuccessBlink) {
-    for (int i=0;i<6;i++) {
+    for (int i = 0; i < 6; i++) {
       digitalWrite(LED_BUILTIN, LOW);
       delay(100);
       digitalWrite(LED_BUILTIN, HIGH);
@@ -815,7 +840,7 @@ void ledLoop() { // Handles status LED
     }
     ledSuccessBlink = false;
   }
-  
+
   if (wm.getConfigPortalActive()) {
     ledState = true;
   } else {
@@ -828,7 +853,7 @@ void ledLoop() { // Handles status LED
       ledState = false;
     }
   }
-  
+
   if (ledState) {
     digitalWrite(LED_BUILTIN, LOW);
   } else {
@@ -839,29 +864,29 @@ void ledLoop() { // Handles status LED
 String extractAssetNameFromTopic(String topic) {
   const int devicePrefixLength = 38;
   const int stateSuffixLength = 8;
-  return topic.substring(devicePrefixLength, topic.length()-stateSuffixLength);
+  return topic.substring(devicePrefixLength, topic.length() - stateSuffixLength);
 }
 
 void mqttCallback(char* p_topic, byte* p_payload, unsigned int p_length) {
   Serial.println("[MQTT] Message Received from AllThingsTalk");
   String topic(p_topic);
-  
+
   // Deserialize JSON
   DynamicJsonDocument doc(256);
   char json[256];
   for (int i = 0; i < p_length; i++) {
-      json[i] = (char)p_payload[i];
+    json[i] = (char)p_payload[i];
   }
   auto error = deserializeJson(doc, json);
   if (error) {
-      Serial.print("[MQTT] Parsing JSON failed. Code: ");
-      Serial.println(error.c_str());
-      return;
+    Serial.print("[MQTT] Parsing JSON failed. Code: ");
+    Serial.println(error.c_str());
+    return;
   }
 
   String asset = extractAssetNameFromTopic(topic);
-//  Serial.print("[MQTT] Asset Name: ");
-//  Serial.println(asset);
+  //  Serial.print("[MQTT] Asset Name: ");
+  //  Serial.println(asset);
 
   if (asset == INTERVAL_ASSET) {
     int value = doc["value"];
@@ -874,17 +899,17 @@ String wifiSignal() {
     int signal = WiFi.RSSI();
     String signalString;
     if (signal < -87) {
-        signalString = "Horrible";
+      signalString = "Horrible";
     } else if (signal >= -87 && signal <= -80) {
-        signalString = "Bad";
+      signalString = "Bad";
     } else if (signal > -80 && signal <= -70) {
-        signalString = "Decent";
+      signalString = "Decent";
     } else if (signal > -70 && signal <= -55) {
-        signalString = "Good";
+      signalString = "Good";
     } else if (signal > -55) {
-        signalString = "Excellent";
+      signalString = "Excellent";
     } else {
-        signalString = "Error";
+      signalString = "Error";
     }
     return signalString;
   }
@@ -970,7 +995,7 @@ bool initMQTT() {
 
 bool connectWiFi() {
   Serial.print("[WiFi] Connecting to WiFi... ");
-  if(!wm.autoConnect(klimerkoID, wifiConfigPortalPassword)) {
+  if (!wm.autoConnect(klimerkoID, wifiConfigPortalPassword)) {
     Serial.print("Failed! Reason: ");
     Serial.println(WiFi.status());
     wifiConnectionLost = true;
@@ -1080,6 +1105,16 @@ void setup() {
   initWiFi();
   initMQTT();
   Serial.println("");
+
+  Serial.printf("Flash real size: %u bytes\n", ESP.getFlashChipRealSize());
+  Serial.printf("Flash IDE size: %u bytes\n", ESP.getFlashChipSize());
+  Serial.printf("Free sketch space: %u bytes\n", ESP.getFreeSketchSpace());
+
+
+  Serial.println("ota check");
+  checkForOTA();
+
+
 }
 
 void loop() {
@@ -1088,5 +1123,5 @@ void loop() {
   maintainMQTT();
   wifiConfigLoop();
   buttonLoop();
-  ledLoop();  
+  ledLoop();
 }
